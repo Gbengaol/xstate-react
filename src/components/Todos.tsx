@@ -1,161 +1,108 @@
-import type { TodoItem, TodosFilter } from "@/lib/todosMachine";
-import { useHashChange } from "@/lib/useHashChange";
-import { cn } from "@/lib/utils";
-import { TodosContext } from "@/routes/old_index";
-import { useEffect, useRef } from "react";
-import { Todo } from "./Todo";
+import { filterTodos } from "@/lib/filter-todos";
+import type { TodosFilter } from "@/lib/types";
+import { useEffect } from "react";
+import { TodoItem } from "./Todo";
+import { TodosMachineContext } from "./todo-machine.context";
+import { Button } from "./ui/button";
+import { Checkbox } from "./ui/checkbox";
+import { Tabs, TabsList, TabsTrigger } from "./ui/tabs";
 
-function filterTodos(filter: TodosFilter, todos: TodoItem[]) {
-	if (filter === "active") {
-		return todos.filter((todo) => !todo.completed);
-	}
-
-	if (filter === "completed") {
-		return todos.filter((todo) => todo.completed);
-	}
-
-	return todos;
-}
-
-export function Todos() {
-	const todosActorRef = TodosContext.useActorRef();
-	const { send } = todosActorRef;
-	const todo = TodosContext.useSelector((s) => s.context.todo);
-	const todos = TodosContext.useSelector((s) => s.context.todos);
-	const filter = TodosContext.useSelector((s) => s.context.filter);
-
+export const Todos = () => {
+	const actorRef = TodosMachineContext.useActorRef();
+	const { send } = actorRef;
+	const todos = TodosMachineContext.useSelector(({ context }) => context.todos);
+	const filter = TodosMachineContext.useSelector(
+		({ context }) => context.filter,
+	);
 	// Persist todos
 	useEffect(() => {
-		todosActorRef.subscribe(() => {
+		actorRef.subscribe(() => {
 			localStorage.setItem(
 				"todos",
-				JSON.stringify(todosActorRef.getPersistedSnapshot?.()),
+				JSON.stringify(actorRef.getPersistedSnapshot?.()),
 			);
 		});
-	}, [todosActorRef]);
+	}, [actorRef]);
 
-	useHashChange(() => {
+	const handleTodosFilter = (filter: TodosFilter) => {
 		send({
-			type: "filter.change",
-			filter: (window.location.hash.slice(2) || "all") as TodosFilter,
+			type: "FILTER_TODOS",
+			filter,
 		});
-	});
+	};
 
-	// Capture initial state of browser hash
-	useEffect(() => {
-		window.location.hash.slice(2) &&
-			send({
-				type: "filter.change",
-				filter: window.location.hash.slice(2) as TodosFilter,
-			});
-	}, []);
-
-	const numActiveTodos = todos.filter((todo) => !todo.completed).length;
+	const filteredTodos = filterTodos(todos, filter);
+	const numActiveTodos = todos.filter((todo) => !todo.done).length;
+	const showTodosResetButton =
+		filter !== "active" && todos.length > numActiveTodos;
 	const allCompleted = todos.length > 0 && numActiveTodos === 0;
-	const mark = !allCompleted ? "completed" : "active";
-	const filteredTodos = filterTodos(filter, todos);
-	const inputRef = useRef<HTMLInputElement>(null);
+	const markFilter = !allCompleted ? "completed" : "active";
 
-	useEffect(() => {
-		if (todos.length === 0) {
-			inputRef.current?.focus();
-		}
-	}, [todos]);
+	const handleMarkAllTodos = () => {
+		send({
+			type: "MARK_ALL",
+			filter: markFilter,
+		});
+	};
 
+	const handleTodosReset = () => {
+		send({
+			type: "CLEAR_COMPLETED",
+		});
+	};
 	return (
-		<section className="todoapp">
-			<header className="header">
-				<h1>todos</h1>
-				<input
-					ref={inputRef}
-					className="new-todo"
-					placeholder="What needs to be done?"
-					autoFocus
-					onKeyDown={(ev) => {
-						if (ev.key === "Enter") {
-							send({ type: "newTodo.commit", value: ev.currentTarget.value });
-						}
-					}}
-					onChange={(ev) =>
-						send({ type: "newTodo.change", value: ev.currentTarget.value })
-					}
-					value={todo}
-				/>
-			</header>
+		<>
+			<Tabs defaultValue="all" className="w-full">
+				<TabsList className="w-full">
+					<TabsTrigger value="all" onClick={() => handleTodosFilter("all")}>
+						All
+					</TabsTrigger>
+					<TabsTrigger
+						value="active"
+						onClick={() => handleTodosFilter("active")}
+					>
+						Active
+					</TabsTrigger>
+					<TabsTrigger
+						value="completed"
+						onClick={() => handleTodosFilter("completed")}
+					>
+						Completed
+					</TabsTrigger>
+				</TabsList>
+			</Tabs>
 
-			{!!todos.length && (
-				<>
-					<section className="main">
-						<input
-							id="toggle-all"
-							className="toggle-all"
-							type="checkbox"
-							checked={allCompleted}
-							onChange={() => {
-								send({
-									type: "todo.markAll",
-									mark: allCompleted ? "active" : "completed",
-								});
-							}}
-						/>
-						<label htmlFor="toggle-all" title={`Mark all as ${mark}`}>
-							Mark all as {mark}
-						</label>
-						<ul className="todo-list">
-							{filteredTodos.map((todo) => (
-								<Todo key={todo.id} todo={todo} />
-							))}
-						</ul>
-					</section>
-
-					<footer className="footer">
-						<span className="todo-count">
-							<strong>{numActiveTodos}</strong> item
-							{numActiveTodos === 1 ? "" : "s"} left
+			{!!filteredTodos.length && (
+				<div className="flex flex-col gap-y-2">
+					<div className="flex items-center justify-between">
+						<span className="flex items-center gap-x-1.5 h-8">
+							<Checkbox
+								checked={false}
+								onCheckedChange={handleMarkAllTodos}
+								className="size-6"
+							/>
+							<small className="text-gray-700">
+								{markFilter === "completed" ? "Check all" : "Uncheck all"}
+							</small>
 						</span>
-						<ul className="filters">
-							<li>
-								<a
-									className={cn({
-										selected: filter === "all",
-									})}
-									href="#/"
-								>
-									All
-								</a>
-							</li>
-							<li>
-								<a
-									className={cn({
-										selected: filter === "active",
-									})}
-									href="#/active"
-								>
-									Active
-								</a>
-							</li>
-							<li>
-								<a
-									className={cn({
-										selected: filter === "completed",
-									})}
-									href="#/completed"
-								>
-									Completed
-								</a>
-							</li>
-						</ul>
-						{numActiveTodos < todos.length && (
-							<button
-								onClick={() => send({ type: "todos.clearCompleted" })}
-								className="clear-completed"
+						{showTodosResetButton && (
+							<Button
+								size="sm"
+								className="h-full"
+								variant={"outline"}
+								onClick={handleTodosReset}
 							>
-								Clear completed
-							</button>
+								Reset
+							</Button>
 						)}
-					</footer>
-				</>
+					</div>
+					<ul>
+						{filteredTodos.map((todo) => {
+							return <TodoItem todo={todo} key={todo.id} />;
+						})}
+					</ul>
+				</div>
 			)}
-		</section>
+		</>
 	);
-}
+};

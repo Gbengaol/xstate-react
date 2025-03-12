@@ -11,16 +11,9 @@
 // Import Routes
 
 import { Route as rootRoute } from './routes/__root'
-import { Route as OldindexImport } from './routes/old_index'
 import { Route as IndexImport } from './routes/index'
 
 // Create/Update Routes
-
-const OldindexRoute = OldindexImport.update({
-  id: '/old_index',
-  path: '/old_index',
-  getParentRoute: () => rootRoute,
-} as any)
 
 const IndexRoute = IndexImport.update({
   id: '/',
@@ -39,13 +32,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexImport
       parentRoute: typeof rootRoute
     }
-    '/old_index': {
-      id: '/old_index'
-      path: '/old_index'
-      fullPath: '/old_index'
-      preLoaderRoute: typeof OldindexImport
-      parentRoute: typeof rootRoute
-    }
   }
 }
 
@@ -53,37 +39,32 @@ declare module '@tanstack/react-router' {
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/old_index': typeof OldindexRoute
 }
 
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/old_index': typeof OldindexRoute
 }
 
 export interface FileRoutesById {
   __root__: typeof rootRoute
   '/': typeof IndexRoute
-  '/old_index': typeof OldindexRoute
 }
 
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/old_index'
+  fullPaths: '/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/old_index'
-  id: '__root__' | '/' | '/old_index'
+  to: '/'
+  id: '__root__' | '/'
   fileRoutesById: FileRoutesById
 }
 
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  OldindexRoute: typeof OldindexRoute
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  OldindexRoute: OldindexRoute,
 }
 
 export const routeTree = rootRoute
@@ -96,15 +77,11 @@ export const routeTree = rootRoute
     "__root__": {
       "filePath": "__root.tsx",
       "children": [
-        "/",
-        "/old_index"
+        "/"
       ]
     },
     "/": {
       "filePath": "index.tsx"
-    },
-    "/old_index": {
-      "filePath": "old_index.tsx"
     }
   }
 }

@@ -1,135 +1,98 @@
 import { assign, setup } from "xstate";
-
-export interface TodoItem {
-  id: string;
-  title: string;
-  completed: boolean;
-}
-
-export type TodosFilter = "all" | "active" | "completed";
+import { filterTodos } from "./filter-todos";
+import type { Todo, TodosFilter } from "./types";
 
 export const todosMachine = setup({
-  types: {} as {
-    context: {
-      todo: string;
-      todos: TodoItem[];
-      filter: TodosFilter;
-    };
-    events:
-      | { type: "newTodo.change"; value: string }
-      | { type: "newTodo.commit"; value: string }
-      | { type: "todo.commit"; todo: TodoItem }
-      | { type: "todo.delete"; id: string }
-      | { type: "filter.change"; filter: TodosFilter }
-      | { type: "todo.mark"; id: string; mark: "active" | "completed" }
-      | { type: "todo.markAll"; mark: "active" | "completed" }
-      | { type: "todos.clearCompleted" };
-  },
+	types: {} as {
+		context: {
+			todo: string;
+			todos: Todo[];
+			filter: TodosFilter;
+		};
+		events:
+			| { type: "ADD_TODO" }
+			| { type: "NEW_TODO_CHANGE"; title: string }
+			| { type: "DELETE_TODO"; id: number }
+			| { type: "TOGGLE_TODO_STATUS"; id: number }
+			| { type: "FILTER_TODOS"; filter: TodosFilter }
+			| { type: "MARK_ALL"; filter: "active" | "completed" }
+			| { type: "CLEAR_COMPLETED" };
+	},
 }).createMachine({
-  id: "todos",
-  context: {
-    todo: "",
-    todos: [
-      {
-        id: "1",
-        title: "Learn state machines",
-        completed: false,
-      },
-    ],
-    filter: "all",
-  },
-  on: {
-    "newTodo.change": {
-      actions: assign({
-        todo: ({ event }) => event.value,
-      }),
-    },
-    "newTodo.commit": {
-      guard: ({ event }) => event.value.trim().length > 0,
-      actions: assign({
-        todo: "",
-        todos: ({ context, event }) => {
-          const newTodo: TodoItem = {
-            id: Math.random().toString(36).substring(7),
-            title: event.value,
-            completed: false,
-          };
-
-          return [...context.todos, newTodo];
-        },
-      }),
-    },
-    "todo.commit": {
-      actions: assign({
-        todos: ({ context, event }) => {
-          const { todo: todoToUpdate } = event;
-
-          if (!todoToUpdate.title.trim().length) {
-            return context.todos.filter((todo) => todo.id !== todoToUpdate.id);
-          }
-
-          return context.todos.map((todo) => {
-            if (todo.id === todoToUpdate.id) {
-              return todoToUpdate;
-            }
-
-            return todo;
-          });
-        },
-      }),
-    },
-    "todo.delete": {
-      actions: assign({
-        todos: ({ context, event }) => {
-          const { id } = event;
-
-          return context.todos.filter((todo) => todo.id !== id);
-        },
-      }),
-    },
-    "filter.change": {
-      actions: assign({
-        filter: ({ event }) => event.filter,
-      }),
-    },
-    "todo.mark": {
-      actions: assign({
-        todos: ({ context, event }) => {
-          const { mark } = event;
-
-          return context.todos.map((todo) => {
-            if (todo.id === event.id) {
-              return {
-                ...todo,
-                completed: mark === "completed",
-              };
-            }
-
-            return todo;
-          });
-        },
-      }),
-    },
-    "todo.markAll": {
-      actions: assign({
-        todos: ({ context, event }) => {
-          const { mark } = event;
-
-          return context.todos.map((todo) => {
-            return {
-              ...todo,
-              completed: mark === "completed",
-            };
-          });
-        },
-      }),
-    },
-    "todos.clearCompleted": {
-      actions: assign({
-        todos: ({ context }) => {
-          return context.todos.filter((todo) => !todo.completed);
-        },
-      }),
-    },
-  },
+	id: "todoMachine",
+	initial: "editing",
+	context: {
+		todos: [],
+		todo: "",
+		filter: "all",
+	},
+	states: {
+		editing: {
+			on: {
+				NEW_TODO_CHANGE: {
+					actions: assign({
+						todo: ({ event }) => event.title,
+					}),
+				},
+				ADD_TODO: {
+					guard: ({ context }) => !!context.todo.trim().length,
+					actions: assign({
+						todos: ({ context: { todos, todo } }) => {
+							return [
+								{
+									title: todo,
+									done: false,
+									id: Date.now(),
+								},
+								...todos,
+							];
+						},
+						todo: "",
+					}),
+				},
+				DELETE_TODO: {
+					actions: assign({
+						todos: ({ context: { todos }, event }) =>
+							todos.filter((currTodo) => currTodo.id !== event.id),
+					}),
+				},
+				TOGGLE_TODO_STATUS: {
+					actions: assign({
+						todos: ({ context: { todos }, event }) =>
+							todos.map((currTodo) =>
+								currTodo.id === event.id
+									? {
+											...currTodo,
+											done: !currTodo.done,
+										}
+									: currTodo,
+							),
+					}),
+				},
+				FILTER_TODOS: {
+					actions: assign({
+						filter: ({ event }) => event.filter,
+					}),
+				},
+				MARK_ALL: {
+					actions: assign({
+						todos: ({ context, event }) =>
+							filterTodos(context.todos, context.filter).map((todoItem) => ({
+								...todoItem,
+								done: event.filter === "completed",
+							})),
+					}),
+				},
+				CLEAR_COMPLETED: {
+					guard: ({ context }) =>
+						!!context.todos.filter((todoItem) => todoItem.done).length,
+					actions: assign({
+						todos: ({ context }) =>
+							context.todos.map((todoItem) => ({ ...todoItem, done: false })),
+					}),
+				},
+			},
+		},
+		working: {},
+	},
 });
