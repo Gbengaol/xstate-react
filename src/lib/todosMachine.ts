@@ -8,27 +8,40 @@ export const todosMachine = setup({
 			todo: string;
 			todos: Todo[];
 			filter: TodosFilter;
+			todoToEdit: Todo | null;
 		};
 		events:
+			| { type: "START_EDITING"; id: Todo["id"] }
+			| { type: "UPDATE_TODO" }
+			| { type: "END_EDITING" }
 			| { type: "ADD_TODO" }
 			| { type: "NEW_TODO_CHANGE"; title: string }
-			| { type: "DELETE_TODO"; id: number }
-			| { type: "TOGGLE_TODO_STATUS"; id: number }
+			| { type: "EDIT_TODO_CHANGE"; title: string }
+			| { type: "DELETE_TODO"; id: Todo["id"] }
+			| { type: "TOGGLE_TODO_STATUS"; id: Todo["id"] }
 			| { type: "FILTER_TODOS"; filter: TodosFilter }
 			| { type: "MARK_ALL"; filter: "active" | "completed" }
 			| { type: "CLEAR_COMPLETED" };
 	},
 }).createMachine({
 	id: "todoMachine",
-	initial: "editing",
+	initial: "working",
 	context: {
 		todos: [],
 		todo: "",
 		filter: "all",
+		todoToEdit: null,
 	},
 	states: {
-		editing: {
+		working: {
 			on: {
+				START_EDITING: {
+					target: "editing",
+					actions: assign({
+						todoToEdit: ({ context, event }) =>
+							context.todos.find(({ id }) => id === event.id) ?? null,
+					}),
+				},
 				NEW_TODO_CHANGE: {
 					actions: assign({
 						todo: ({ event }) => event.title,
@@ -93,6 +106,44 @@ export const todosMachine = setup({
 				},
 			},
 		},
-		working: {},
+		editing: {
+			exit: assign({
+				todoToEdit: () => null,
+			}),
+			on: {
+				END_EDITING: {
+					target: "working",
+				},
+				EDIT_TODO_CHANGE: {
+					guard: ({ context }) => !!context?.todoToEdit,
+					actions: assign({
+						todoToEdit: ({ event, context }) => {
+							if (!context.todoToEdit) return null;
+							return {
+								...context.todoToEdit,
+								title: event.title,
+							};
+						},
+					}),
+				},
+				UPDATE_TODO: {
+					guard: ({ context }) => !!context?.todoToEdit,
+					actions: assign({
+						todos: ({ context }) =>
+							context.todos.map((todo) => {
+								const todoToEdit = context.todoToEdit;
+								if (todo.id === todoToEdit?.id) {
+									return {
+										...todo,
+										title: todoToEdit.title,
+										done: false,
+									};
+								}
+								return todo;
+							}),
+					}),
+				},
+			},
+		},
 	},
 });

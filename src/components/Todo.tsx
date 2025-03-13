@@ -1,4 +1,5 @@
 import type { Todo } from "@/lib/types";
+import { FilePenLineIcon, TrashIcon } from "lucide-react";
 import { TodosMachineContext } from "./todo-machine.context";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
@@ -11,16 +12,23 @@ export const TodoItem: React.FC<TodoProps> = ({ todo }) => {
 	const actorRef = TodosMachineContext.useActorRef();
 	const { send } = actorRef;
 
-	const handleToggleDone = (id: number) => {
+	const handleToggleDone = (id: Todo["id"]) => {
 		send({
 			type: "TOGGLE_TODO_STATUS",
 			id,
 		});
 	};
 
-	const handleTodoDelete = (id: number) => {
+	const handleTodoDelete = (id: Todo["id"]) => {
 		send({
 			type: "DELETE_TODO",
+			id,
+		});
+	};
+
+	const handleEditTodo = (id: Todo["id"]) => {
+		send({
+			type: "START_EDITING",
 			id,
 		});
 	};
@@ -35,13 +43,22 @@ export const TodoItem: React.FC<TodoProps> = ({ todo }) => {
 				/>
 				{todo.title}
 			</span>
-			<Button
-				variant="destructive"
-				size="sm"
-				onClick={() => handleTodoDelete(todo.id)}
-			>
-				Delete
-			</Button>
+			<span className="flex items-center space-x-1">
+				<Button
+					variant="secondary"
+					size="icon"
+					onClick={() => handleEditTodo(todo.id)}
+				>
+					<FilePenLineIcon />
+				</Button>
+				<Button
+					variant="destructive"
+					size="icon"
+					onClick={() => handleTodoDelete(todo.id)}
+				>
+					<TrashIcon />
+				</Button>
+			</span>
 		</li>
 	);
 };
